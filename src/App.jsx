@@ -410,24 +410,35 @@ const AuthPage = ({ onBack, isDark }) => {
   );
 };
 const handleApply = async (job) => {
-  const templateParams = {
-    // This key MUST be 'email' to match Capture_14.PNG
-    email: auth.currentUser.email, 
-    user_name: auth.currentUser.displayName || "Applicant",
-    job_title: job.title,
-    from_name: "Akshaya" 
-  };
-
   try {
+    // 1. First, save the application to your database (Firebase)
+    // This ensures you have a record even if the email fails
+    await addDoc(collection(db, "applications"), {
+      jobId: job.id,
+      email: auth.currentUser.email,
+      status: "Applied",
+      appliedAt: new Date()
+    });
+
+    // 2. NOW PLACE YOUR PARAMS HERE
+    const templateParams = {
+      email: auth.currentUser.email, // Matches {{email}} in Capture_14.PNG
+      user_name: auth.currentUser.displayName || "Applicant",
+      job_title: job.title 
+    };
+
+    // 3. Send the email using the params you just defined
     await emailjs.send(
-      'service_nnhsy0x',
-      'template_h7e3u3b',
-      templateParams,
+      'service_nnhsy0x', 
+      'template_h7e3u3b', 
+      templateParams,    // This passes your object to EmailJS
       'UppEL37Gjo-2ICVRN'
     );
-    console.log("Success! Notification sent and Reply-To is active.");
-  } catch (err) {
-    console.error("Email failed:", err);
+
+    alert("Success! Your application was sent and confirmed via email.");
+
+  } catch (error) {
+    console.error("Submission failed:", error);
+    alert("Could not complete application. Check the console for errors.");
   }
 };
-
