@@ -20,3 +20,12 @@ const app = initializeApp(firebaseConfig);
 // Export the services so App.jsx can find them
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+import { doc, setDoc, getDoc } from "firebase/firestore";
+
+export const createUserProfile = async (user, role) => {
+  const userRef = doc(db, "users", user.uid);
+  await setDoc(userRef, {
+    email: user.email,
+    role: role, // 'employer' or 'candidate'
+  }, { merge: true });
+};

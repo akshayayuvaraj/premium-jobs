@@ -406,3 +406,24 @@ const AuthPage = ({ onBack, isDark }) => {
     </motion.div>
   );
 };
+const handleApply = async (job) => {
+  const templateParams = {
+    // This key MUST be 'email' to match Capture_14.PNG
+    email: auth.currentUser.email, 
+    user_name: auth.currentUser.displayName || "Applicant",
+    job_title: job.title,
+    from_name: "Akshaya" 
+  };
+
+  try {
+    await emailjs.send(
+      'service_nnhsy0x',
+      'template_h7e3u3b',
+      templateParams,
+      'UppEL37Gjo-2ICVRN'
+    );
+    console.log("Success! Notification sent and Reply-To is active.");
+  } catch (err) {
+    console.error("Email failed:", err);
+  }
+};
