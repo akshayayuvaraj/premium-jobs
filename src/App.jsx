@@ -9,6 +9,7 @@ import { MeshDistortMaterial, Sphere, Float, Stars, Points, PointMaterial } from
 import * as THREE from 'three';
 import React, { useState } from 'react';
 import emailjs from '@emailjs/browser'; // <--- PUT IT HERE
+import JobCard from './components/JobCard';
 // ... your other imports like firebase
 
 // Firebase Imports
