@@ -3,5 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: './', // This is critical! It tells Vite to use relative paths
+  // Ensures assets are loaded from the root domain
+  base: '/', 
+  build: {
+    // Helps with the 'large chunks' warning you saw in the terminal
+    chunkSizeWarningLimit: 1600,
+  },
 })
