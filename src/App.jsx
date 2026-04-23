@@ -7,6 +7,9 @@ import {
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { MeshDistortMaterial, Sphere, Float, Stars, Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
+import React, { useState } from 'react';
+import emailjs from '@emailjs/browser'; // <--- PUT IT HERE
+// ... your other imports like firebase
 
 // Firebase Imports
 import { auth, db } from './firebase';
@@ -427,3 +430,4 @@ const handleApply = async (job) => {
     console.error("Email failed:", err);
   }
 };
+
