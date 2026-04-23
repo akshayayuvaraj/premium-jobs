@@ -3,12 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Removed leading slash from /favicon.svg -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>premium-jobs</title>
-  </head>
-  <body>
-    <div id="root"></div>
+   <!-- BEFORE -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<script type="module" src="/src/main.jsx"></script>
+
+<!-- AFTER (Correct) -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<script type="module" src="src/main.jsx"></script>
     <!-- Removed leading slash from /src/main.jsx -->
     <script type="module" src="src/main.jsx"></script>
   </body>

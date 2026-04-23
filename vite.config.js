@@ -1,10 +1,8 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/react-swc'
+import react from '@vitejs/plugin-react'
 
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/premium-jobs/', // REPLACE THIS with your exact GitHub repository name
+  // This matches your GitHub repository name exactly
+  base: '/premium-jobs/', 
 })
-
-
