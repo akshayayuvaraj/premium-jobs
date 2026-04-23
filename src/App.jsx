@@ -4,16 +4,12 @@ import {
   Search, Briefcase, Sun, Moon, Lock, Mail, ArrowLeft, 
   Globe, LogOut, Loader2, Sparkles, Upload, Send, CheckCircle2, X 
 } from 'lucide-react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { MeshDistortMaterial, Sphere, Float, Stars, Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import React, { useState } from 'react';
-import emailjs from '@emailjs/browser'; // <--- PUT IT HERE
-// Add this at the very top of App.jsx
-import React from 'react';
-import JobCard from './components/JobCard'; // <--- Check this path
-import EmployerDashboard from './components/EmployerDashboard';;
-// ... your other imports like firebase
+import emailjs from '@emailjs/browser';
+import JobCard from './components/JobCard';
+import EmployerDashboard from './components/EmployerDashboard';
+// ... any other unique imports like Firebase or CSS
 
 // Firebase Imports
 import { auth, db } from './firebase';

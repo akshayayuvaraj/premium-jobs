@@ -29,3 +29,13 @@ const handleApply = async (job) => {
     console.error("Error:", error);
   }
 };
+// Ensure 'export default' is right here!
+export default function JobCard({ job, handleApply }) {
+  return (
+    <div className="job-card">
+      <h3>{job.title}</h3>
+      {/* ... the rest of your JobCard code ... */}
+      <button onClick={() => handleApply(job)}>Apply Now</button>
+    </div>
+  );
+}
