@@ -1,32 +1,82 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&display=swap');
 
-@theme {
-  --color-primary: #3b82f6;
-  --color-surface-light: #ffffff;
-  --color-surface-dark: #020617;
-  --color-glass-light: rgba(255, 255, 255, 0.7);
-  --color-glass-dark: rgba(15, 23, 42, 0.7);
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
 }
 
-:root {
-  transition: background-color 0.5s ease, color 0.5s ease;
-}
-
-.dark {
-  color-scheme: dark;
-  --background: var(--color-surface-dark);
-  --foreground: #f8fafc;
-}
-
-.light {
-  color-scheme: light;
-  --background: var(--color-surface-light);
-  --foreground: #0f172a;
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
   margin: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  padding: 0;
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* File input styling */
+input[type="file"] {
+  cursor: pointer;
+}
+
+/* Select option color fix */
+option {
+  background-color: #111827;
+  color: white;
+}
+
+/* Glassmorphism utility */
+.glass-dark {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, opacity;
+  transition-timing-function: ease;
+  transition-duration: 200ms;
+}
+
+/* Prevent transition on transform/filter to avoid sluggishness */
+*:hover {
+  transition-property: background-color, border-color, color, opacity, transform, box-shadow;
 }

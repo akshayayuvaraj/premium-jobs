@@ -1,444 +1,431 @@
-import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Briefcase, Sun, Moon, Lock, Mail, ArrowLeft, 
-  Globe, LogOut, Loader2, Sparkles, Upload, Send, CheckCircle2, X 
-} from 'lucide-react';
-import { MeshDistortMaterial, Sphere, Float, Stars, Points, PointMaterial } from '@react-three/drei';
-import * as THREE from 'three';
-import emailjs from '@emailjs/browser';
-import JobCard from './components/JobCard';
-import EmployerDashboard from './components/EmployerDashboard';
-// ... any other unique imports like Firebase or CSS
-
-// Firebase Imports
-import { auth, db } from './firebase';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged, 
-  signOut 
+import { useState, useEffect, Suspense, lazy } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
 } from "firebase/auth";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "./firebase";
+import { Sun, Moon, LogOut, Briefcase, ChevronDown, Loader2 } from "lucide-react";
+import emailjs from '@emailjs/browser';
 
-// --- 1. EXPANDED JOB LIST (18 TOTAL) ---
-const BACKUP_JOBS = [
-  { id: 'm1', title: "Lead VFX Artist", company: "Industrial Light & Magic", location: "San Francisco, CA", salary: "$210k - $280k", cat: "Design" },
-  { id: 'm2', title: "Senior Frontend Architect", company: "Vercel", location: "Remote", salary: "$190k - $240k", cat: "Engineering" },
-  { id: 'm3', title: "Product Strategy Lead", company: "Stripe", location: "New York, NY", salary: "$185k - $220k", cat: "Management" },
-  { id: 'm4', title: "Motion Designer", company: "Buck Design", location: "Los Angeles, CA", salary: "$140k - $175k", cat: "Design" },
-  { id: 'm5', title: "Backend Engineer (Go)", company: "Cloudflare", location: "Austin, TX", salary: "$170k - $210k", cat: "Engineering" },
-  { id: 'm6', title: "Creative Director", company: "Apple", location: "Cupertino, CA", salary: "$250k - $310k", cat: "Design" },
-  { id: 'm7', title: "AI Research Engineer", company: "OpenAI", location: "San Francisco, CA", salary: "$300k - $450k", cat: "Engineering" },
-  { id: 'm8', title: "UX Writer", company: "Airbnb", location: "Remote", salary: "$130k - $160k", cat: "Design" },
-  { id: 'm9', title: "Technical Program Manager", company: "Google", location: "London, UK", salary: "£140k - £180k", cat: "Management" },
-  // 9 NEW JOBS
-  { id: 'm10', title: "Starship Propulsion Engineer", company: "SpaceX", location: "Boca Chica, TX", salary: "$180k - $250k", cat: "Engineering" },
-  { id: 'm11', title: "Neural Interface Designer", company: "Neuralink", location: "Fremont, CA", salary: "$220k - $300k", cat: "Design" },
-  { id: 'm12', title: "Global Security Lead", company: "Palantir", location: "Denver, CO", salary: "$195k - $260k", cat: "Management" },
-  { id: 'm13', title: "Full Stack Developer", company: "Supabase", location: "Remote", salary: "$150k - $190k", cat: "Engineering" },
-  { id: 'm14', title: "Brand Identity Director", company: "Nike", location: "Beaverton, OR", salary: "$200k - $275k", cat: "Design" },
-  { id: 'm15', title: "Quantitative Researcher", company: "Citadel", location: "Miami, FL", salary: "$400k - $600k", cat: "Management" },
-  { id: 'm16', title: "Blockchain Architect", company: "Ethereum Foundation", location: "Remote", salary: "$180k - $240k", cat: "Engineering" },
-  { id: 'm17', title: "Humanoid Robotics Expert", company: "Tesla", location: "Austin, TX", salary: "$210k - $290k", cat: "Engineering" },
-  { id: 'm18', title: "Head of Growth", company: "Discord", location: "San Francisco, CA", salary: "$190k - $230k", cat: "Management" }
-];
-
-// --- 2. ENHANCED 3D BACKGROUND ---
-const InteractiveParticles = ({ isDark }) => {
-  const points = useRef();
-  const [coords] = useState(() => {
-    const arr = [];
-    for (let i = 0; i < 2000; i++) {
-      arr.push((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
-    }
-    return new Float32Array(arr);
-  });
-
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
-    points.current.rotation.y = time * 0.05;
-    points.current.rotation.x = Math.sin(time * 0.1) * 0.2;
-    // Mouse interaction
-    points.current.position.x = THREE.MathUtils.lerp(points.current.position.x, state.mouse.x * 0.5, 0.1);
-  });
-
-  return (
-    <Points ref={points} positions={coords} stride={3}>
-      <PointMaterial
-        transparent
-        color={isDark ? "#3b82f6" : "#60a5fa"}
-        size={0.015}
-        sizeAttenuation={true}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </Points>
-  );
-};
-
-const BackgroundScene = ({ isDark }) => {
-  const mesh = useRef();
-  useFrame((state) => {
-    if (mesh.current) {
-      mesh.current.distort = 0.4 + Math.sin(state.clock.getElapsedTime() / 2) * 0.1;
-      mesh.current.rotation.z += 0.001;
-    }
-  });
-
-  return (
-    <>
-      <InteractiveParticles isDark={isDark} />
-      <Float speed={2} rotationIntensity={0.5} floatIntensity={1}>
-        <Sphere ref={mesh} args={[1, 128, 256]} scale={2.4}>
-          <MeshDistortMaterial 
-            color={isDark ? "#1d4ed8" : "#93c5fd"} 
-            distort={0.5} 
-            speed={3} 
-            metalness={isDark ? 0.9 : 0.1} 
-            roughness={0.2} 
-          />
-        </Sphere>
-      </Float>
-    </>
-  );
-};
-
-// --- 3. MAIN APPLICATION ---
-export default function App() {
-  const [isDark, setIsDark] = useState(true);
-  const [user, setUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [firebaseJobs, setFirebaseJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedJob, setSelectedJob] = useState(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const q = query(collection(db, "jobs"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const jobsArr = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setFirebaseJobs(jobsArr);
-    }, () => console.warn("Using backup job list."));
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    isDark ? root.classList.add('dark') : root.classList.remove('dark');
-  }, [isDark]);
-
-  const displayJobs = useMemo(() => firebaseJobs.length > 0 ? firebaseJobs : BACKUP_JOBS, [firebaseJobs]);
-  const filteredJobs = useMemo(() => displayJobs.filter(job => 
-    job.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    job.company?.toLowerCase().includes(searchQuery.toLowerCase())
-  ), [searchQuery, displayJobs]);
-
-  if (loading) return (
-    <div className="h-screen w-full flex items-center justify-center bg-[#020617]">
-      <Loader2 className="text-blue-500 animate-spin" size={48} />
-    </div>
-  );
-
-  return (
-    <div className="relative min-h-screen transition-colors duration-700 overflow-x-hidden bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-white">
-      
-      {/* 3D Visuals */}
-      <div className="fixed inset-0 z-0 h-screen w-full pointer-events-none transition-opacity duration-1000">
-        <Suspense fallback={null}>
-          <Canvas camera={{ position: [0, 0, 5] }}>
-            <ambientLight intensity={isDark ? 0.3 : 1} />
-            <pointLight position={[10, 10, 10]} />
-            <BackgroundScene isDark={isDark} />
-          </Canvas>
-        </Suspense>
-      </div>
-
-      <div className="relative z-10">
-        {/* Navigation */}
-        <nav className="flex justify-between items-center px-10 py-8 max-w-[1600px] mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl rotate-12 flex items-center justify-center font-black text-white text-2xl shadow-lg">O</div>
-            <span className="text-3xl font-black italic bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">Opus</span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            {user ? (
-              <div className="flex items-center gap-4">
-                <span className="hidden md:block text-sm font-bold opacity-60">{user.email}</span>
-                <button onClick={() => signOut(auth)} className="flex items-center gap-2 px-6 py-3 bg-red-500/10 text-red-500 rounded-xl font-bold hover:bg-red-500 hover:text-white transition-all">
-                  <LogOut size={18} /> Sign Out
-                </button>
-              </div>
-            ) : (
-              <button onClick={() => setShowLogin(true)} className="px-10 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold shadow-xl transition-all active:scale-95">
-                Sign In
-              </button>
-            )}
-          </div>
-        </nav>
-
-        <AnimatePresence mode="wait">
-          {showLogin && !user ? (
-            <AuthPage key="auth" onBack={() => setShowLogin(false)} isDark={isDark} />
-          ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-6">
-              <header className="pt-20 pb-20 text-center">
-                <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600/10 border border-blue-600/20 text-blue-600 text-[11px] font-black uppercase tracking-widest mb-10">
-                  <Sparkles size={14} fill="currentColor" /> Premium Career Hub
-                </span>
-                <h1 className="text-7xl md:text-[110px] font-bold tracking-tighter leading-none mb-12">
-                  Find Your <br /> 
-                  <span className="text-blue-600 transition-colors duration-700">Universe.</span>
-                </h1>
-
-                <div className="flex flex-col md:flex-row gap-4 items-center justify-center backdrop-blur-3xl bg-white/70 dark:bg-white/5 p-3 rounded-[3rem] border border-black/10 dark:border-white/10 w-full max-w-3xl mx-auto shadow-2xl transition-colors duration-700">
-                  <Search className="ml-6 text-slate-400" size={24} />
-                  <input 
-                    type="text" 
-                    placeholder="Search premium roles..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-transparent border-none outline-none py-6 px-4 w-full text-lg font-medium placeholder-slate-400"
-                  />
-                  <button className="w-full md:w-auto px-14 py-6 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-xl shadow-blue-600/30 hover:bg-blue-700 transition-all">
-                    Explore
-                  </button>
-                </div>
-              </header>
-
-              {/* Job Grid */}
-              <section className="max-w-[1400px] mx-auto pb-40">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {filteredJobs.map((job) => (
-                    <motion.div 
-                      layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      key={job.id} 
-                      className="group p-10 rounded-[40px] bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/5 backdrop-blur-xl shadow-xl hover:-translate-y-2 transition-all duration-500"
-                    >
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="w-14 h-14 bg-blue-600/10 text-blue-600 rounded-xl flex items-center justify-center">
-                          <Briefcase size={24} />
-                        </div>
-                        <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest">{job.cat}</span>
-                      </div>
-                      <h3 className="text-2xl font-bold mb-2 group-hover:text-blue-600 transition-colors">{job.title}</h3>
-                      <p className="text-slate-500 font-medium mb-8">{job.company}</p>
-                      
-                      <div className="flex flex-col gap-4">
-                        <div className="flex justify-between items-center pt-6 border-t border-black/5 dark:border-white/5 font-bold text-sm uppercase tracking-widest">
-                          <span className="flex items-center gap-2 text-slate-400"><Globe size={16} /> {job.location}</span>
-                          <span className="text-blue-500">{job.salary}</span>
-                        </div>
-                        <button 
-                          onClick={() => setSelectedJob(job)}
-                          className="w-full py-4 mt-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase text-xs tracking-tighter hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all"
-                        >
-                          Apply Now
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </section>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Application Modal */}
-        <AnimatePresence>
-          {selectedJob && (
-            <ApplicationForm job={selectedJob} onClose={() => setSelectedJob(null)} />
-          )}
-        </AnimatePresence>
-      </div>
-
-      <button 
-        onClick={() => setIsDark(!isDark)} 
-        className="fixed bottom-8 right-8 z-[100] w-16 h-16 rounded-full bg-white dark:bg-slate-800 shadow-2xl flex items-center justify-center border border-black/10 dark:border-white/10 transition-all hover:scale-110 active:scale-90"
-      >
-        {isDark ? <Sun className="text-yellow-400" size={28} /> : <Moon className="text-indigo-600" size={28} />}
-      </button>
-    </div>
-  );
-}
-
-// --- 4. APPLICATION FORM COMPONENT ---
-const ApplicationForm = ({ job, onClose }) => {
-  const [step, setStep] = useState(1); // 1: Form, 2: Success
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setStep(2);
-    }, 2000);
+const sendNotification = (userEmail, jobTitle, companyName) => {
+  // 1. Prepare the parameters to match your EmailJS Template tags {{ }}
+  const templateParams = {
+    user_email: userEmail,    // matches {{user_email}} in dashboard
+    job_title: jobTitle,      // matches {{job_title}} in dashboard
+    company_name: companyName // matches {{company_name}} in dashboard
   };
 
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
-    >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 20 }}
-        className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[50px] p-10 shadow-2xl relative overflow-hidden"
-      >
-        <button onClick={onClose} className="absolute top-8 right-8 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
-          <X size={24} />
-        </button>
+  // 2. Send the email using the VITE_ variable names
+  emailjs.send(
+  import.meta.env.VITE_EMAILJS_SERVICE_ID,   // This points to your service ID
+  import.meta.env.VITE_EMAILJS_TEMPLATE_ID,  // This points to your template ID
+  templateParams,
+  import.meta.env.VITE_EMAILJS_PUBLIC_KEY    // This points to your public key
+)
+.then((response) => {
+  console.log('Email sent successfully!', response.status, response.text);
+})
+.catch((err) => {
+  console.error('Email failed to send:', err);
+});}
 
-        {step === 1 ? (
-          <>
-            <h2 className="text-4xl font-bold mb-2">Apply for <span className="text-blue-600">{job.title}</span></h2>
-            <p className="text-slate-500 mb-8 font-medium">at {job.company} • {job.location}</p>
+const HeroCanvas = lazy(() => import("./components/HeroCanvas"));
+const EmployerDashboard = lazy(() => import("./components/EmployerDashboard"));
+const CandidateDashboard = lazy(() => import("./components/CandidateDashboard"));
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <input required type="text" placeholder="Full Name" className="w-full py-5 px-8 bg-black/5 dark:bg-white/5 rounded-2xl outline-none focus:ring-2 ring-blue-500/50" />
-                <input required type="email" placeholder="Email Address" className="w-full py-5 px-8 bg-black/5 dark:bg-white/5 rounded-2xl outline-none focus:ring-2 ring-blue-500/50" />
-              </div>
-              <input type="url" placeholder="Portfolio / LinkedIn URL" className="w-full py-5 px-8 bg-black/5 dark:bg-white/5 rounded-2xl outline-none focus:ring-2 ring-blue-500/50" />
-              
-              <div className="border-2 border-dashed border-black/10 dark:border-white/10 rounded-3xl p-8 text-center hover:border-blue-500/50 transition-colors group cursor-pointer">
-                <div className="w-12 h-12 bg-blue-600/10 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                  <Upload size={20} />
-                </div>
-                <p className="text-sm font-bold uppercase tracking-widest opacity-60">Upload CV / Resume</p>
-                <p className="text-xs opacity-40 mt-1">PDF, DOCX up to 10MB</p>
-              </div>
+// ── tiny helpers ────────────────────────────────────────────────────────────
+const inputCls = (dark) =>
+  `w-full px-4 py-3 rounded-xl text-sm outline-none transition-all border
+   ${dark
+     ? "bg-white/6 border-white/12 text-white placeholder-white/30 focus:border-violet-500/70 focus:bg-white/10"
+     : "bg-black/4 border-black/10 text-gray-900 placeholder-gray-400 focus:border-violet-500/60 focus:bg-white"
+   }`;
 
-              <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-blue-600/30 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <><Send size={18} /> Submit Application</>}
-              </button>
-            </form>
-          </>
-        ) : (
-          <div className="text-center py-10">
-            <div className="w-24 h-24 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 size={48} />
-            </div>
-            <h2 className="text-4xl font-bold mb-4">Application Sent!</h2>
-            <p className="text-slate-500 max-w-md mx-auto mb-8 font-medium">
-              We've received your application for {job.title}. The team at {job.company} will review it shortly.
-            </p>
-            <button 
-              onClick={onClose}
-              className="px-12 py-5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase tracking-widest"
-            >
-              Back to Jobs
-            </button>
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
-};
+const glass = (dark) =>
+  `backdrop-blur-xl border ${dark ? "bg-white/8 border-white/12" : "bg-white/70 border-black/8"}`;
 
-// --- AUTH COMPONENT ---
-const AuthPage = ({ onBack, isDark }) => {
-  const [isRegister, setIsRegister] = useState(false);
+// ── Auth Modal ───────────────────────────────────────────────────────────────
+function AuthModal({ isDark, onClose }) {
+  const [mode, setMode] = useState("login"); // login | signup
+  const [role, setRole] = useState("candidate");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [name, setName] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setErr("");
+    setLoading(true);
     try {
-      if (isRegister) {
-        await createUserWithEmailAndPassword(auth, email, password);
+      if (mode === "signup") {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "users", cred.user.uid), { name, email, role, createdAt: new Date() });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      onBack();
-    } catch (err) {
-      setError(err.message.replace("Firebase:", ""));
+      onClose();
+    } catch (e) {
+      setErr(e.message.replace("Firebase: ", "").replace(/\(auth\/.*\)/, "").trim());
     }
+    setLoading(false);
   };
 
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="min-h-[80vh] flex items-center justify-center">
-      <div className="w-full max-w-xl p-12 rounded-[50px] bg-white dark:bg-slate-900 shadow-2xl border border-black/5 dark:border-white/10 transition-colors duration-700">
-        <button onClick={onBack} className="flex items-center gap-2 text-blue-600 font-bold mb-10"><ArrowLeft size={18} /> Back</button>
-        <h2 className="text-5xl font-bold tracking-tighter mb-2 text-slate-900 dark:text-white">{isRegister ? "Join Opus." : "Welcome Back."}</h2>
-        <p className="text-slate-500 mb-10 font-medium">{isRegister ? "Create your career profile." : "Enter the vault."}</p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full py-5 pl-14 pr-6 bg-black/5 dark:bg-white/5 rounded-2xl outline-none focus:ring-2 ring-blue-500/50 text-slate-900 dark:text-white" />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)" }}
+      onClick={onClose}>
+      <motion.div
+        initial={{ scale: 0.9, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 24 }}
+        onClick={e => e.stopPropagation()}
+        className={`w-full max-w-sm rounded-2xl border p-7 shadow-2xl
+          ${isDark ? "bg-gray-950 border-white/15" : "bg-white border-black/10"}`}>
+
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-6">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+            <Briefcase size={16} className="text-white" />
           </div>
-          <div className="relative">
-            <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full py-5 pl-14 pr-6 bg-black/5 dark:bg-white/5 rounded-2xl outline-none focus:ring-2 ring-blue-500/50 text-slate-900 dark:text-white" />
-          </div>
-          {error && <p className="text-red-500 text-xs font-bold px-2">{error}</p>}
-          <button className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-blue-600/30 hover:bg-blue-700">
-            {isRegister ? "Create Account" : "Sign In"}
+          <span className={`font-bold text-base ${isDark ? "text-white" : "text-gray-900"}`}>NexaJobs</span>
+        </div>
+
+        <h2 className={`text-xl font-bold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+          {mode === "login" ? "Welcome back" : "Create account"}
+        </h2>
+        <p className={`text-sm mb-5 ${isDark ? "text-white/45" : "text-gray-500"}`}>
+          {mode === "login" ? "Sign in to your account" : "Join thousands of professionals"}
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {mode === "signup" && (
+            <input className={inputCls(isDark)} placeholder="Full Name" value={name}
+              onChange={e => setName(e.target.value)} required />
+          )}
+          <input type="email" className={inputCls(isDark)} placeholder="Email" value={email}
+            onChange={e => setEmail(e.target.value)} required />
+          <input type="password" className={inputCls(isDark)} placeholder="Password" value={password}
+            onChange={e => setPassword(e.target.value)} required minLength={6} />
+
+          {mode === "signup" && (
+            <div className={`flex rounded-xl overflow-hidden border ${isDark ? "border-white/12" : "border-black/10"}`}>
+              {["candidate", "employer"].map(r => (
+                <button key={r} type="button" onClick={() => setRole(r)}
+                  className={`flex-1 py-2.5 text-sm font-medium capitalize transition-all
+                    ${role === r
+                      ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white"
+                      : isDark ? "bg-white/5 text-white/55 hover:bg-white/10" : "bg-black/3 text-gray-500 hover:bg-black/6"
+                    }`}>
+                  {r === "employer" ? "👔 Employer" : "👤 Candidate"}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {err && <p className="text-red-400 text-xs px-1">{err}</p>}
+
+          <button type="submit" disabled={loading}
+            className="w-full py-3 rounded-xl font-semibold bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm flex items-center justify-center gap-2 shadow-lg shadow-violet-500/25 disabled:opacity-60 mt-1">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+            {mode === "login" ? "Sign In" : "Create Account"}
           </button>
         </form>
-        <p className="text-center mt-8 text-sm font-bold text-slate-500">
-          {isRegister ? "Already a member?" : "New to the platform?"}{" "}
-          <span onClick={() => setIsRegister(!isRegister)} className="text-blue-600 cursor-pointer hover:underline">
-            {isRegister ? "Sign In" : "Register Now"}
-          </span>
+
+        <p className={`text-center text-sm mt-4 ${isDark ? "text-white/45" : "text-gray-500"}`}>
+          {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(""); }}
+            className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
+            {mode === "login" ? "Sign up" : "Sign in"}
+          </button>
         </p>
-      </div>
+      </motion.div>
     </motion.div>
   );
-};
-const handleApply = async (job) => {
-  try {
-    // 1. First, save the application to your database (Firebase)
-    // This ensures you have a record even if the email fails
-    await addDoc(collection(db, "applications"), {
-      jobId: job.id,
-      email: auth.currentUser.email,
-      status: "Applied",
-      appliedAt: new Date()
+}
+
+// ── Navbar ───────────────────────────────────────────────────────────────────
+function Navbar({ user, userRole, isDark, toggleTheme, onAuth, onLogout }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 40);
+    window.addEventListener("scroll", fn);
+    return () => window.removeEventListener("scroll", fn);
+  }, []);
+
+  return (
+    <motion.nav
+      initial={{ y: -60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6 }}
+      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300
+        ${scrolled ? `${glass(isDark)} shadow-lg shadow-black/10` : "bg-transparent"}`}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-md">
+            <Briefcase size={15} className="text-white" />
+          </div>
+          <span className={`font-bold text-base tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>NexaJobs</span>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button onClick={toggleTheme}
+            className={`p-2 rounded-lg transition-all ${isDark ? "hover:bg-white/10 text-white/70" : "hover:bg-black/6 text-gray-600"}`}>
+            {isDark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+
+          {user ? (
+            <div className="flex items-center gap-2">
+              <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs
+                ${isDark ? "bg-white/6 text-white/70" : "bg-black/5 text-gray-600"}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                {userRole === "employer" ? "Employer" : "Candidate"}
+              </div>
+              <button onClick={onLogout}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all
+                  ${isDark ? "hover:bg-white/10 text-white/60" : "hover:bg-black/6 text-gray-500"}`}>
+                <LogOut size={14} /> Logout
+              </button>
+            </div>
+          ) : (
+            <button onClick={onAuth}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all">
+              Get Started
+            </button>
+          )}
+        </div>
+      </div>
+    </motion.nav>
+  );
+}
+
+// ── Hero ─────────────────────────────────────────────────────────────────────
+function Hero({ isDark, onGetStarted }) {
+  return (
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Background gradients */}
+      <div className="absolute inset-0 pointer-events-none">
+        {isDark ? (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-900/25 rounded-full blur-[120px]" />
+            <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-900/20 rounded-full blur-[100px]" />
+            <div className="absolute top-1/2 right-1/3 w-60 h-60 bg-blue-900/15 rounded-full blur-[80px]" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-violet-50/30 to-blue-50/20" />
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-200/40 rounded-full blur-[120px]" />
+            <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-200/30 rounded-full blur-[100px]" />
+          </>
+        )}
+      </div>
+
+      {/* 3D Canvas */}
+      <Suspense fallback={null}>
+        <HeroCanvas />
+      </Suspense>
+
+      {/* Content */}
+      <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}>
+          <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium mb-6 border
+            ${isDark ? "bg-violet-500/10 border-violet-500/25 text-violet-300" : "bg-violet-100 border-violet-200 text-violet-700"}`}>
+            ✦ Next-generation job platform
+          </span>
+        </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.35 }}
+          className={`text-5xl sm:text-6xl lg:text-7xl font-black leading-[1.06] tracking-tight mb-5
+            ${isDark ? "text-white" : "text-gray-900"}`}>
+          Find Your{" "}
+          <span className="relative">
+            <span className="bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              Dream Job
+            </span>
+          </span>
+          <br />in Seconds
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.5 }}
+          className={`text-lg sm:text-xl mb-10 max-w-2xl mx-auto leading-relaxed
+            ${isDark ? "text-white/55" : "text-gray-500"}`}>
+          Explore premium opportunities with a next-gen job platform
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.65 }}
+          className="flex flex-col sm:flex-row gap-3.5 justify-center items-center">
+          <button onClick={onGetStarted}
+            className="px-8 py-3.5 rounded-xl font-bold text-base bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xl shadow-violet-500/30 hover:shadow-violet-500/50 hover:-translate-y-0.5 transition-all duration-200">
+            Get Started →
+          </button>
+          <button onClick={() => document.getElementById("jobs-section")?.scrollIntoView({ behavior: "smooth" })}
+            className={`px-8 py-3.5 rounded-xl font-semibold text-base border transition-all hover:-translate-y-0.5 duration-200
+              ${isDark
+                ? "bg-white/8 border-white/15 text-white hover:bg-white/14"
+                : "bg-black/4 border-black/12 text-gray-800 hover:bg-black/8"
+              }`}>
+            Explore Jobs
+          </button>
+        </motion.div>
+
+        {/* Scroll hint */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }}
+          className="mt-16 flex flex-col items-center gap-2">
+          <span className={`text-xs ${isDark ? "text-white/30" : "text-gray-400"}`}>Scroll to explore</span>
+          <ChevronDown size={18} className={`animate-bounce ${isDark ? "text-white/30" : "text-gray-400"}`} />
+        </motion.div>
+      </div>
+
+      {/* Stats bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.9 }}
+        className={`absolute bottom-8 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-0 rounded-2xl border overflow-hidden
+          ${isDark ? "bg-white/6 border-white/10" : "bg-white/70 border-black/8"} backdrop-blur-xl`}>
+        {[
+          { label: "Jobs Posted", value: "12,400+" },
+          { label: "Companies", value: "3,200+" },
+          { label: "Hired", value: "89,000+" },
+        ].map((s, i) => (
+          <div key={s.label} className={`px-6 py-3 text-center ${i < 2 ? (isDark ? "border-r border-white/10" : "border-r border-black/8") : ""}`}>
+            <div className={`text-base font-bold ${isDark ? "text-white" : "text-gray-900"}`}>{s.value}</div>
+            <div className={`text-xs ${isDark ? "text-white/40" : "text-gray-500"}`}>{s.label}</div>
+          </div>
+        ))}
+      </motion.div>
+    </section>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [isDark, setIsDark] = useState(true);
+  const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        const snap = await getDoc(doc(db, "users", u.uid));
+        setUserRole(snap.exists() ? snap.data().role : "candidate");
+      } else {
+        setUserRole(null);
+      }
+      setAuthLoading(false);
     });
+    return unsub;
+  }, []);
 
-    // 2. NOW PLACE YOUR PARAMS HERE
-    const templateParams = {
-      email: auth.currentUser.email, // Matches {{email}} in Capture_14.PNG
-      user_name: auth.currentUser.displayName || "Applicant",
-      job_title: job.title 
-    };
+  const handleLogout = async () => {
+    await signOut(auth);
+    setUser(null);
+    setUserRole(null);
+  };
 
-    // 3. Send the email using the params you just defined
-    await emailjs.send(
-      'service_nnhsy0x', 
-      'template_h7e3u3b', 
-      templateParams,    // This passes your object to EmailJS
-      'UppEL37Gjo-2ICVRN'
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+            <Briefcase size={18} className="text-white" />
+          </div>
+          <Loader2 size={20} className="text-violet-400 animate-spin" />
+        </div>
+      </div>
     );
-
-    alert("Success! Your application was sent and confirmed via email.");
-
-  } catch (error) {
-    console.error("Submission failed:", error);
-    alert("Could not complete application. Check the console for errors.");
   }
-};
+
+  return (
+    <div className={`min-h-screen font-sans transition-colors duration-300 ${isDark ? "bg-gray-950 text-white" : "bg-slate-50 text-gray-900"}`}
+      style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+
+      <Navbar
+        user={user} userRole={userRole} isDark={isDark}
+        toggleTheme={() => setIsDark(d => !d)}
+        onAuth={() => setShowAuth(true)}
+        onLogout={handleLogout}
+      />
+
+      {/* Auth Modal */}
+      <AnimatePresence>
+        {showAuth && <AuthModal isDark={isDark} onClose={() => setShowAuth(false)} />}
+      </AnimatePresence>
+
+      {/* Hero */}
+      <Hero isDark={isDark} onGetStarted={() => {
+        if (user) document.getElementById("jobs-section")?.scrollIntoView({ behavior: "smooth" });
+        else setShowAuth(true);
+      }} />
+
+      {/* Dashboard Section */}
+      <section id="jobs-section" className="max-w-6xl mx-auto px-4 sm:px-6 py-16">
+        {user ? (
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.6 }}>
+            <div className="mb-8">
+              <h2 className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                {userRole === "employer" ? "Employer Dashboard" : "Browse Jobs"}
+              </h2>
+              <p className={`text-sm mt-1 ${isDark ? "text-white/45" : "text-gray-500"}`}>
+                {userRole === "employer"
+                  ? "Manage your job postings and track applications"
+                  : "Discover your next opportunity"}
+              </p>
+            </div>
+            <Suspense fallback={
+              <div className="flex justify-center py-20">
+                <Loader2 size={28} className="text-violet-400 animate-spin" />
+              </div>
+            }>
+              {userRole === "employer"
+                ? <EmployerDashboard isDark={isDark} />
+                : <CandidateDashboard isDark={isDark} />
+              }
+            </Suspense>
+          </motion.div>
+        ) : (
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.6 }}
+            className={`text-center py-20 rounded-3xl border border-dashed
+              ${isDark ? "border-white/12 text-white/40" : "border-black/10 text-gray-400"}`}>
+            <Briefcase size={44} className="mx-auto mb-4 opacity-30" />
+            <p className="text-lg font-medium mb-2">Sign in to explore jobs</p>
+            <p className="text-sm mb-6">Create an account or sign in to browse and apply for jobs</p>
+            <button onClick={() => setShowAuth(true)}
+              className="px-6 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/20">
+              Get Started
+            </button>
+          </motion.div>
+        )}
+      </section>
+
+      {/* Footer */}
+      <footer className={`border-t py-8 ${isDark ? "border-white/8 text-white/30" : "border-black/6 text-gray-400"}`}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+              <Briefcase size={12} className="text-white" />
+            </div>
+            <span className="text-sm font-semibold">NexaJobs</span>
+          </div>
+          <p className="text-xs">© 2025 NexaJobs. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
